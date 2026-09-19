@@ -20,7 +20,7 @@ The default manipulation sequence is:
 
 `approach -> grasp -> lift -> transport -> place -> release`
 
-Video perception and public robotics-dataset adapters will be added in later milestones. V1 deliberately does **not** claim that success/failure can already be inferred automatically from raw video.
+The repository now includes DROID RLDS loading, video/frame processing, object tracking, temporal stage inference, robot/vision fusion, reporting, and automatic telemetry-event detection. Raw-video-only six-stage evaluation is **not yet claimed**: generic COCO detection was not reliable enough for the marker/gripper in the real validation episode.
 
 ## Quick start
 
