@@ -1,139 +1,157 @@
 # Physical AI Robot Task Evaluator
 
-**Real robot-manipulation evaluation using DROID episodes, robot telemetry, computer vision, and evidence reports.**
+**Real DROID robot-task evaluation prototype with automatic telemetry-stage detection and evidence-aware visual validation.**
 
-> **Real validation task:** `Put the marker in the pot` — DROID Episode 0, 166 robot steps.
+> Validated demo task: **Put the marker in the pot** — DROID Episode 0, 166 robot steps.
 
-## Real DROID demo
+## Real DROID evidence
 
 <p align="center">
-  <img src="docs/assets/episode0_before.jpg" width="24%" alt="Real DROID frame before pickup">
-  <img src="docs/assets/episode0_grasp.jpg" width="24%" alt="Real DROID frame during grasp and lift">
-  <img src="docs/assets/episode0_place.jpg" width="24%" alt="Real DROID frame during placement and release">
-  <img src="docs/assets/episode0_after.jpg" width="24%" alt="Real DROID frame after release">
+  <img src="docs/assets/episode0_before.jpg" width="24%" alt="DROID Episode 0 before pickup">
+  <img src="docs/assets/episode0_grasp.jpg" width="24%" alt="DROID Episode 0 during grasp and lift">
+  <img src="docs/assets/episode0_place.jpg" width="24%" alt="DROID Episode 0 near placement and release">
+  <img src="docs/assets/episode0_after.jpg" width="24%" alt="DROID Episode 0 after release">
 </p>
 
-| BEFORE | GRASP / LIFT | PLACE / RELEASE | AFTER |
+| Before | Grasp / lift | Place / release | After |
 |---|---|---|---|
-| Robot approaches marker | Gripper holds marker and lifts | Marker reaches pot and release starts | Gripper withdraws |
+| Robot approaches the pickup area | Gripper closes and end effector rises | Robot reaches the pot area and release begins | Gripper withdraws |
 
-**These image slots are for real frames extracted from the validated DROID episode — not AI-generated illustrations.**
+These are **real frames from the locally validated DROID episode**, not generated illustrations.
 
-## What this project does
+## What the prototype evaluates
 
-The evaluator analyzes a robot manipulation episode as an ordered physical task:
+A manipulation task is represented as:
 
-`Approach → Grasp → Lift → Transport → Place → Release`
+**Approach → Grasp → Lift → Transport → Place → Release**
 
-It combines robot state and visual evidence instead of treating a single object detector prediction as ground truth.
+The demo intentionally separates what is automatic from what was visually validated.
 
-## How it works
+| Stage | Automatic telemetry path | Episode 0 human validation |
+|---|---|---|
+| Approach | UNKNOWN | PASS |
+| Grasp | PASS candidate | PASS |
+| Lift | PASS | PASS |
+| Transport | PASS | PASS |
+| Place | UNKNOWN | PASS |
+| Release | PASS candidate | PASS |
+
+The automatic evaluator therefore returns **INCOMPLETE (4/6 established)** for Episode 0. A separate targeted inspection of the real RGB evidence supports the full **human-validated 6/6 SUCCESS**. The project does not turn uncertain visual detections into automatic PASS results.
+
+## Architecture
 
 ```text
-REAL DROID EPISODE
-        │
-        ├──────────────┐
-        ▼              ▼
- Robot telemetry    RGB cameras
- gripper + pose     wrist + exterior
-        │              │
-        ▼              ▼
- Event detector     Visual reasoning
-        │              │
-        │              ├── Approach evidence
-        │              └── Place evidence
-        │
-        ├── Grasp
-        ├── Lift
-        ├── Transport
-        └── Release
-        │
-        └──────────┬───────────┘
-                   ▼
-          SIX-STAGE EVALUATOR
-                   ▼
-       SUCCESS / FAILURE / INCOMPLETE
-                   ▼
-          JSON + HTML REPORT
+DROID RLDS episode
+       │
+       ├───────────────┐
+       ▼               ▼
+Robot telemetry      RGB observations
+gripper + EE pose    wrist + exterior
+       │               │
+       ▼               ▼
+Telemetry events     Visual validation / experiments
+       │               │
+       ├─ Grasp         ├─ real evidence frames
+       ├─ Lift          ├─ detector/tracker baseline
+       ├─ Transport     └─ wrist temporal analysis
+       └─ Release
+       │
+       └──────────┬──────────┘
+                  ▼
+          Six-stage evaluator
+                  ▼
+      SUCCESS / FAILURE / INCOMPLETE
+                  ▼
+          JSON + HTML reports
 ```
 
-## Real Episode 0 evidence
+## Measured Episode 0 telemetry
 
-| Stage | Validation | Evidence |
-|---|---|---|
-| Approach | PASS | targeted wrist-camera inspection |
-| Grasp | PASS | automatic telemetry + visual evidence |
-| Lift | PASS | automatic telemetry + visual evidence |
-| Transport | PASS | automatic telemetry + visual evidence |
-| Place | PASS | targeted wrist-camera inspection |
-| Release | PASS | automatic telemetry + visual evidence |
-
-### Automatically measured telemetry
-
-| Event | Result |
+| Measurement | Real result |
 |---|---:|
 | Pickup low point | frame 62 |
-| Grasp candidate | frame 66 |
-| Lift detected | frame 80 |
-| Release candidate | frame 139 |
+| Grasp transition | frame 66 |
+| Lift threshold reached | frame 80 |
+| Release transition | frame 139 |
 | Lift rise at threshold | ~0.057 m |
 | Grasp-to-release EE displacement | ~0.175 m |
 
-**Human-validated Episode 0 result: `SUCCESS — 6/6`.**
+These values came from the real Episode 0 run. The detector itself does not hard-code those frame numbers.
 
-The current automatic telemetry path establishes Grasp, Lift, Transport, and Release. Approach and Place are intentionally kept unknown in fully automatic mode until trustworthy object-relative visual evidence is available.
+## Visual experiments and what they proved
 
-## Example evaluator output
+A generic pretrained YOLO model executed successfully, but its COCO labels were not reliable task semantics for the marker and robot gripper. A telemetry-conditioned track-role experiment also confused multiple detections around the pot. A wrist-frame differencing experiment detected motion, but simple translation compensation did not isolate local object motion reliably on the moving wrist camera.
 
-```text
-Task: Put the marker in the pot
+Those experiments are retained because they document an important evaluator behavior: **insufficient evidence becomes UNKNOWN, not a fabricated success.**
 
-APPROACH    PASS
-GRASP       PASS     frame 66
-LIFT        PASS     frame 80
-TRANSPORT   PASS
-PLACE       PASS
-RELEASE     PASS     frame 139
+## Quick start
 
-Completion: 6/6
-Result: SUCCESS
+### 1. Create an environment
 
-Validation:
-REAL DROID + ROBOT TELEMETRY + VISUAL EVIDENCE
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m pip install -r requirements-droid.txt
 ```
 
-## Why this is a Physical AI project
+Install a TensorFlow build compatible with your OS/Python if it is not already available. Vision experiments additionally use:
 
-The project works with **real embodied-agent data**, not only text or tabular data. It processes synchronized robot proprioception and RGB observations, detects temporal manipulation events, reasons over ordered physical stages, and produces reviewable evidence.
+```bash
+python -m pip install -r requirements-vision.txt
+```
 
-## Repository components
+### 2. Run tests
 
-- `src/droid_adapter.py` — loads real DROID RLDS episodes.
-- `src/droid_event_detector.py` — automatically detects telemetry events.
-- `src/automatic_droid_evaluator.py` — automatic evidence-aware evaluator.
-- `src/object_tracking.py` — YOLO detection + transparent tracking baseline.
-- `src/role_identifier.py` — temporal gripper/object/target role reasoning.
-- `src/action_stage_detector.py` — ordered six-stage inference.
-- `src/report_generator.py` — JSON + HTML evidence reports.
-- `evaluate_droid_automatic.py` — automatic DROID CLI.
-- `docs/demo.md` — detailed real Episode 0 walkthrough.
+```bash
+python -m pytest -v
+```
 
-## Run on DROID
+### 3. Run the automatic DROID evaluator
 
 ```bash
 python evaluate_droid_automatic.py /path/to/droid_100/1.0.0 --episode 0
 ```
 
-Large DROID data and generated run directories are intentionally excluded from Git.
+Expected semantics:
 
-## Current limitation
+```text
+Approach   UNKNOWN
+Grasp      PASS
+Lift       PASS
+Transport  PASS
+Place      UNKNOWN
+Release    PASS
 
-Generic COCO YOLO did not reliably identify the marker or robot gripper in the real Episode 0 scene. The project therefore does **not** convert arbitrary COCO labels into fake robot-task roles. Fully automatic Approach and Place remain the main visual-perception milestone.
+Automatic status: INCOMPLETE
+Established stages: 4/6
+```
+
+The command writes machine-readable JSON and a human-readable HTML report under `results/automatic/`.
+
+## Repository guide
+
+- `src/droid_adapter.py` — decodes DROID RLDS episodes.
+- `src/droid_event_detector.py` — detects grasp/lift/release events and transport displacement.
+- `src/automatic_droid_evaluator.py` — honest telemetry-only stage evaluation.
+- `src/task_evaluator.py` — six-stage SUCCESS/FAILURE/INCOMPLETE core.
+- `src/report_generator.py` — JSON + HTML reports with PASS/FAIL/UNKNOWN.
+- `src/object_tracking.py` — optional YOLO + centroid-tracking baseline.
+- `src/temporal_visual_roles.py` — experimental telemetry-conditioned role reasoning.
+- `src/wrist_temporal_vision.py` — experimental wrist-camera temporal analysis.
+- `docs/demo.md` — detailed Episode 0 evidence walkthrough.
+- `docs/portfolio_demo.md` — step-by-step presentation script.
+
+## Data and reproducibility
+
+The DROID dataset, model weights, videos, and generated `results/` directories are intentionally excluded from Git because they are large/generated artifacts. The repository contains the source code, tests, documentation, and four compact real evidence images needed to understand the demo.
+
+## Scope and limitations
+
+This repository is a **portfolio prototype, not a benchmark claim**. It has been validated in depth on real DROID Episode 0. It does not claim measured accuracy across the full DROID dataset. Camera calibration is not assumed for the RLDS-only sample. Automatic Approach and Place remain future perception work.
 
 ## Project status
 
-**Working Physical AI portfolio prototype with real DROID validation.**
+**Demo-ready portfolio prototype.**
 
-Completed: DROID loading, real frame/video extraction, robot telemetry decoding, automatic grasp/lift/transport/release detection, tracking baseline, six-stage evaluation core, JSON/HTML reporting, and real Episode 0 validation.
-
-In progress: robust automatic object/gripper understanding, automatic Approach/Place evidence, multi-episode validation, and final demo/report polish.
+The research implementation is frozen at an evidence-safe boundary: automatic telemetry establishes four stages, real visual evidence demonstrates the complete Episode 0 sequence, and uncertain automatic visual perception remains explicitly UNKNOWN rather than being overstated.
