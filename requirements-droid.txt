@@ -1,0 +1,2 @@
+tensorflow-datasets>=4.9,<5.0
+# TensorFlow is platform-sensitive; install a compatible TensorFlow build for your Python/OS.
