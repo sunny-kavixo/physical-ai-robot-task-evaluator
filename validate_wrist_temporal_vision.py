@@ -26,5 +26,5 @@ def main():
     for x in strongest:
         c="None" if x.centroid is None else f"({x.centroid[0]:.1f}, {x.centroid[1]:.1f})"
         print(f"frame={x.frame_index:3d} change={x.change_score:7.2f} changed={x.changed_fraction:.3f} centroid={c} shift=({x.shift_xy[0]:.0f},{x.shift_xy[1]:.0f})")
-    print("\nMOTION-COMPENSATED ANALYSIS: PASS")
+    print("\nMOTION-COMPENSATED ANALYSIS: COMPLETE")\n    print("Note: COMPLETE means the analysis ran; it does not certify compensation quality.")
 if __name__=="__main__": main()
