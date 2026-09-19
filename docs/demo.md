@@ -4,102 +4,87 @@
 
 **Instruction:** `Put the marker in the pot`
 
-This demo uses a real episode from the official DROID 100-episode RLDS debugging sample. The episode contains 166 robot steps and synchronized robot state plus wrist/exterior RGB observations.
+This demo uses a real episode from the DROID 100-episode RLDS debugging sample. Episode 0 contains 166 robot steps with synchronized robot state and wrist/exterior RGB observations.
 
 ## Before → manipulation → after
 
 | Before pickup | Grasp / lift | Place / release | After |
 |---|---|---|---|
 | ![Before pickup](assets/episode0_before.jpg) | ![Grasp and lift](assets/episode0_grasp.jpg) | ![Place and release](assets/episode0_place.jpg) | ![After release](assets/episode0_after.jpg) |
-| Marker is still at the pickup area; robot approaches. | Telemetry changes to the holding state and the end effector rises. | Robot reaches the pot area and the gripper transitions toward release. | Gripper withdraws after the placement sequence. |
+| Marker remains in the pickup area while the robot approaches. | The gripper transitions to the holding state and the end effector rises. | The robot reaches the pot area and transitions toward release. | The gripper withdraws after the placement sequence. |
 
-> These are real DROID frames selected from the locally validated Episode 0. The images are evidence examples, not model-generated illustrations.
+These are real DROID frames selected from the locally validated Episode 0.
 
-## How the evaluator works
+## Evidence pipeline
 
 ```text
 DROID episode
-     │
-     ├── Robot telemetry
-     │      ├── gripper position
-     │      └── Cartesian end-effector pose
-     │
-     ├── RGB observations
-     │      ├── wrist camera
-     │      └── exterior cameras
-     │
-     ▼
-Automatic telemetry event detector
-     │
-     ├── Grasp
-     ├── Lift
-     ├── Transport
-     └── Release
-     │
-     ▼
-Visual object/target reasoning
-     │
-     ├── Approach
-     └── Place
-     │
-     ▼
-Six-stage task evaluator
-     │
-     ├── Approach
-     ├── Grasp
-     ├── Lift
-     ├── Transport
-     ├── Place
-     └── Release
-     │
-     ▼
-SUCCESS / FAILURE / INCOMPLETE
-     │
-     ├── JSON report
-     └── HTML evidence report
+   ├── telemetry → Grasp / Lift / Transport / Release
+   └── RGB frames → visual review and perception experiments
+                         ↓
+                 six-stage evaluator
+                         ↓
+             JSON + HTML evidence report
 ```
 
-## Measured Episode 0 telemetry
+## Automatically measured telemetry
 
-| Event | Automatically detected evidence |
+| Event | Episode 0 result |
 |---|---:|
 | Pickup low point | frame 62 |
-| Grasp candidate | frame 66 |
+| Grasp transition | frame 66 |
 | Lift threshold reached | frame 80 |
-| Release candidate | frame 139 |
+| Release transition | frame 139 |
 | Lift rise at threshold | ~0.057 m |
 | Grasp-to-release EE displacement | ~0.175 m |
 
-The telemetry detector calculates these events from the episode. It does not hard-code the frame numbers above.
+The detector calculates these events from telemetry; it does not hard-code these Episode 0 frame numbers.
 
-## Six-stage validation result
+## Automatic result versus human validation
 
-Targeted human inspection of the real wrist-camera frames plus decoded robot telemetry supported this Episode 0 sequence:
-
-| Stage | Episode 0 validation | Evidence source |
+| Stage | Automatic telemetry mode | Human Episode 0 validation |
 |---|---|---|
-| Approach | PASS | visual evidence |
-| Grasp | PASS | automatic telemetry + visual check |
-| Lift | PASS | automatic telemetry + visual check |
-| Transport | PASS | automatic telemetry + visual check |
-| Place | PASS | visual evidence |
-| Release | PASS | automatic telemetry + visual check |
+| Approach | UNKNOWN | PASS |
+| Grasp | PASS candidate | PASS |
+| Lift | PASS | PASS |
+| Transport | PASS | PASS |
+| Place | UNKNOWN | PASS |
+| Release | PASS candidate | PASS |
 
-**Human-validated result: SUCCESS — 6/6 stages.**
+**Automatic status: INCOMPLETE — 4/6 stages established.**
 
-This result must not be confused with a fully automatic benchmark result. The current automatic telemetry path can establish Grasp, Lift, Transport, and Release. Approach and Place remain unknown until trustworthy object-relative visual evidence is available.
+**Human-validated Episode 0 result: SUCCESS — 6/6 stages.**
 
-## Why generic YOLO is not treated as ground truth
+These are deliberately separate claims. The automatic path does not infer Approach or Place from telemetry alone.
 
-During real-data validation, a generic COCO YOLO model produced labels such as `bowl`, `cup`, `person`, `oven`, and `motorcycle` for parts of the DROID scene. Those labels are not reliable robot-task semantics. The project therefore does not force a marker/gripper identity from a wrong class label.
+## Visual-perception experiments
 
-This limitation is deliberate: an evaluator that reports `UNKNOWN` when evidence is insufficient is more useful than one that manufactures a confident success.
+### Generic detector/tracker
+
+A generic COCO YOLO model ran successfully but did not reliably identify the marker or robot gripper. Detector class names are therefore treated as diagnostic proposals, not robot-task truth.
+
+### Telemetry-conditioned visual roles
+
+Temporal track reasoning was tested using the grasp-to-release window. Real-image crop inspection showed ambiguous/fragmented detections around the pot, so those assignments were not promoted to stage evidence.
+
+### Wrist temporal analysis
+
+Raw wrist-frame differencing detected large scene changes. A simple translation-compensation experiment did not reduce global motion reliably on the real episode, so its centroids are not used as proof of Approach or Place.
+
+## Reporting rule
+
+The project uses three evidence states:
+
+- **PASS** — the required evidence was established;
+- **FAIL** — contradictory/failure evidence was established;
+- **UNKNOWN** — available evidence is insufficient.
+
+This prevents an experimental perception result from silently becoming a false task-success claim.
 
 ## Reports
 
-The evaluator writes both:
+`evaluate_droid_automatic.py` writes:
+- JSON for machine-readable stage results, telemetry events, provenance, and limitations;
+- HTML for human review.
 
-- **JSON** — machine-readable stage results, event frames, provenance, and limitations.
-- **HTML** — a human-readable evidence report for review or portfolio demonstration.
-
-The final demo will include generated report examples after multi-episode validation is complete.
+See [portfolio_demo.md](portfolio_demo.md) for the final presentation walkthrough.
