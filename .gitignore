@@ -10,5 +10,8 @@ htmlcov/
 *.mp4
 *.mov
 *.avi
+*.zip
+*.pt
 data/
-results/generated/
+results/
+runs/
