@@ -1,9 +1,7 @@
-"""Calibration-free automatic DROID evaluator.
+"""Evidence-aware automatic telemetry evaluator for DROID episodes.
 
-Uses robot telemetry for events that telemetry can support directly and keeps
-object-relative stages UNKNOWN until trustworthy visual evidence is available.
-This prevents a generic detector misclassification from becoming a fake task
-success.
+Telemetry can establish grasp, lift, transport, and release candidates.
+Object-relative visual stages remain UNKNOWN unless separately validated.
 """
 from dataclasses import asdict
 
@@ -26,7 +24,6 @@ def evaluate_telemetry_episode(
         gripper_threshold=gripper_threshold,
         lift_threshold_m=lift_threshold_m,
     )
-
     grasp = True if events.grasp_frame is not None else None
     lift = True if events.lift_frame is not None else None
     transport = (
@@ -43,8 +40,6 @@ def evaluate_telemetry_episode(
         else None
     )
 
-    # Approach and place require object-relative evidence. Do not manufacture
-    # them from end-effector motion alone.
     stage_map = {
         "approach": None,
         "grasp": grasp,
@@ -53,66 +48,42 @@ def evaluate_telemetry_episode(
         "place": None,
         "release": release,
     }
-
     evaluation = RobotTaskEvaluator().evaluate(
         task_id=f"droid-{episode_index}",
         instruction=instruction or "DROID manipulation episode",
         stages=stage_map,
     )
-
     evidence = [
-        {
-            "stage": "approach",
-            "achieved": None,
-            "frame_index": None,
-            "reason": "requires trustworthy object-relative visual evidence",
-        },
-        {
-            "stage": "grasp",
-            "achieved": grasp,
-            "frame_index": events.grasp_frame,
-            "reason": "automatic gripper LOW-to-HIGH transition",
-        },
-        {
-            "stage": "lift",
-            "achieved": lift,
-            "frame_index": events.lift_frame,
-            "reason": f"automatic end-effector rise >= {lift_threshold_m:.3f} m after grasp",
-        },
-        {
-            "stage": "transport",
-            "achieved": transport,
-            "frame_index": events.release_frame if transport else None,
-            "reason": f"grasp-to-release end-effector displacement >= {transport_threshold_m:.3f} m",
-        },
-        {
-            "stage": "place",
-            "achieved": None,
-            "frame_index": None,
-            "reason": "requires trustworthy object-to-target visual evidence",
-        },
-        {
-            "stage": "release",
-            "achieved": release,
-            "frame_index": events.release_frame,
-            "reason": "automatic gripper HIGH-to-LOW transition after grasp",
-        },
+        {"stage": "approach", "achieved": None, "frame_index": None,
+         "reason": "requires trustworthy object-relative visual evidence"},
+        {"stage": "grasp", "achieved": grasp, "frame_index": events.grasp_frame,
+         "reason": "automatic gripper LOW-to-HIGH transition"},
+        {"stage": "lift", "achieved": lift, "frame_index": events.lift_frame,
+         "reason": f"automatic end-effector rise >= {lift_threshold_m:.3f} m after grasp"},
+        {"stage": "transport", "achieved": transport,
+         "frame_index": events.release_frame if transport else None,
+         "reason": f"grasp-to-release end-effector displacement >= {transport_threshold_m:.3f} m"},
+        {"stage": "place", "achieved": None, "frame_index": None,
+         "reason": "requires trustworthy object-to-target visual evidence"},
+        {"stage": "release", "achieved": release, "frame_index": events.release_frame,
+         "reason": "automatic gripper HIGH-to-LOW transition after grasp"},
     ]
-
     return {
         "instruction": instruction,
         "episode_index": episode_index,
-        "mode": "automatic_telemetry",
-        "fully_automatic": True,
+        "mode": "automatic_telemetry_with_visual_unknowns",
+        "fully_automatic_six_stage": False,
         "stage_evidence": evidence,
         "telemetry_events": asdict(events),
         "evaluation": evaluation.to_dict(),
         "provenance": {
             "uses_human_visual_validation": False,
             "uses_camera_calibration": False,
+            "automatic_stages": ["grasp", "lift", "transport", "release"],
+            "unknown_stages": ["approach", "place"],
             "limitations": (
-                "Approach and place remain UNKNOWN without trustworthy "
-                "object-relative visual evidence; telemetry alone cannot prove them."
+                "Approach and Place remain UNKNOWN in automatic mode because "
+                "telemetry alone cannot prove object-relative visual events."
             ),
         },
     }
