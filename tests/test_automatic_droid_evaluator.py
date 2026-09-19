@@ -24,4 +24,5 @@ def test_automatic_telemetry_keeps_visual_stages_unknown():
     assert stages["place"] is None
     assert stages["release"] is True
     assert payload["evaluation"]["status"] == "INCOMPLETE"
-    assert payload["fully_automatic"] is True
+    assert payload["fully_automatic_six_stage"] is False
+    assert payload["provenance"]["automatic_stages"] == ["grasp", "lift", "transport", "release"]
