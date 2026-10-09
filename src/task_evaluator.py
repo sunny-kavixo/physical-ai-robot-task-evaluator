@@ -45,7 +45,7 @@ class RobotTaskEvaluator:
         normalized: dict[str, bool | None] = {}
         for stage in self.expected_stages:
             value = stages.get(stage)
-            if value not in (True, False, None):
+            if value is not True and value is not False and value is not None:
                 raise TypeError(f"{stage!r} must be True, False, or None")
             normalized[stage] = value
 
