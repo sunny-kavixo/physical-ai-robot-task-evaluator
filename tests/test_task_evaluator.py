@@ -32,3 +32,24 @@ def test_missing_stages_are_incomplete():
 def test_empty_task_id_is_rejected():
     with pytest.raises(ValueError):
         RobotTaskEvaluator().evaluate("", "task", {})
+
+
+@pytest.mark.parametrize("value", [1, 0, 2, -1, "true", "false"])
+def test_non_boolean_stage_values_are_rejected(value):
+    evaluator = RobotTaskEvaluator(expected_stages=("grasp",))
+
+    with pytest.raises(TypeError, match="'grasp' must be True, False, or None"):
+        evaluator.evaluate("4", "pick and place", {"grasp": value})
+
+
+@pytest.mark.parametrize(
+    ("value", "expected_status"),
+    [(True, "SUCCESS"), (False, "FAILURE"), (None, "INCOMPLETE")],
+)
+def test_boolean_and_unknown_stage_values_remain_supported(value, expected_status):
+    evaluator = RobotTaskEvaluator(expected_stages=("grasp",))
+
+    report = evaluator.evaluate("5", "pick and place", {"grasp": value})
+
+    assert report.status == expected_status
+    assert report.stage_results == {"grasp": value}
